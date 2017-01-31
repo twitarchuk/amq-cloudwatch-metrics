@@ -1,0 +1,84 @@
+#!/usr/local/bin/ruby
+require 'rubygems'
+require 'open-uri'
+require 'xmlsimple'
+require 'aws-sdk'
+require 'logger'
+
+$logger = Logger.new(STDOUT)
+$logger.level = Logger::INFO
+if ENV['LOG_VEBOSE'] == 'true'
+  $logger.level = Logger::DEBUG
+end
+
+def main
+
+  cw_region = ENV['CLOUDWATCH_REGION'] || 'ap-southeast-2'
+  cw_namespace = ENV['CLOUDWATCH_NAMESPACE'] || 'ActiveMQ'
+  cw_interval = ENV['CLOUDWATCH_INTERVAL_SEC'] || 5*60 #5 mintues
+
+  environment_name = ENV['ENVIRONMENT'] || nil
+
+  amq_url = ENV["AMQ_ADMIN_URL"]
+  amq_user = ENV["AMQ_ADMIN_USER"] || 'admin'
+  amq_pass = ENV["AMQ_ADMIN_PASS"] || 'admin'
+
+  if amq_url.nil? then
+    $logger.error("please set AMQ_ADMIN_URL environment variable")
+    exit 1
+  end
+
+  Aws.config.update({region: cw_region})
+  cw_client = Aws::CloudWatch::Client.new()
+
+  while true
+    $logger.info("pubishing queue stats for #{amq_url} to cloudwatch")
+    queues = fetch_queue_stats(amq_url, amq_user, amq_pass)
+    publish_queue_stats(cw_client, cw_namespace, create_metric_data(queues, environment_name))
+    $logger.info("pubished metrics for #{queues.size} queues")
+    sleep(cw_interval.to_i)
+  end
+end
+
+def fetch_queue_stats(url, user, pass)
+  amq_queues = XmlSimple.xml_in(open(url,http_basic_authentication: [user, pass]))
+  queues = []
+  amq_queues['queue'].each do |queue|
+    q = {}
+    q['name'] = queue['name']
+    q['stats'] = queue['stats'][0]
+    queues << q
+  end
+  queues
+end
+
+
+def publish_queue_stats(cw_client, namespace, metic_data)
+  batch_count = 0
+  metic_data.each_slice(20) do |batch|
+    put_metric_params = Aws::CloudWatch::Types::PutMetricDataInput.new({
+      'namespace' => namespace,
+      'metric_data' => batch
+    })
+    $logger.info("putting cloudwatch metric data batch  #{batch.size + (batch_count * batch.size)} of #{metic_data.size}")
+    $logger.debug { "metic_data:#{batch}" }
+    # cw_client.put_metric_data(put_metric_params)
+    batch_count = batch_count + 1
+  end
+
+end
+
+def create_metric_data(queues, environment_name=nil)
+  metic_data = []
+  queues.each do |queue|
+    dimensions = [{name: 'QueueName', value: queue['name']}]
+    dimensions << {name: 'Environment', value: environment_name} unless environment_name.nil?
+    metic_data << Aws::CloudWatch::Types::MetricDatum.new({ 'metric_name' => 'QueueDepth', 'value' => queue['stats']['size'], 'dimensions' => dimensions})
+    metic_data << Aws::CloudWatch::Types::MetricDatum.new({ 'metric_name' => 'ConsumerCount', 'value' => queue['stats']['consumerCount'], 'dimensions' => dimensions})
+    metic_data << Aws::CloudWatch::Types::MetricDatum.new({ 'metric_name' => 'EnqueueCount', 'value' => queue['stats']['enqueueCount'], 'dimensions' => dimensions})
+    metic_data << Aws::CloudWatch::Types::MetricDatum.new({ 'metric_name' => 'DequeueCount', 'value' => queue['stats']['dequeueCount'], 'dimensions' => dimensions})
+  end
+  metic_data
+end
+
+main
