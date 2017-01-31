@@ -62,7 +62,7 @@ def publish_queue_stats(cw_client, namespace, metic_data)
     })
     $logger.info("putting cloudwatch metric data batch  #{batch.size + (batch_count * batch.size)} of #{metic_data.size}")
     $logger.debug { "metic_data:#{batch}" }
-    # cw_client.put_metric_data(put_metric_params)
+    cw_client.put_metric_data(put_metric_params)
     batch_count = batch_count + 1
   end
 
