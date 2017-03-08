@@ -33,23 +33,31 @@ def main
   cw_client = Aws::CloudWatch::Client.new()
 
   while true
-    $logger.info("pubishing queue stats for #{amq_url} to cloudwatch")
-    queues = fetch_queue_stats(amq_url, amq_user, amq_pass)
-    publish_queue_stats(cw_client, cw_namespace, create_metric_data(queues, environment_name))
-    $logger.info("pubished metrics for #{queues.size} queues")
+    begin
+      $logger.info("pubishing queue stats for #{amq_url} to cloudwatch")
+      queues = fetch_queue_stats(amq_url, amq_user, amq_pass, amq_queues_to_monitor)
+      publish_queue_stats(cw_client, cw_namespace, create_metric_data(queues, environment_name))
+      $logger.info("pubished metrics for #{queues.size} queues")
+    rescue Exception => e
+      $logger.error("failed to publish stats - #{e}")
+    end
     sleep(cw_interval.to_i)
   end
 end
 
-def fetch_queue_stats(url, user, pass)
-  amq_queues = XmlSimple.xml_in(open(url,http_basic_authentication: [user, pass]))
+def fetch_queue_stats(url, user, pass, amq_queues_to_monitor)
   queues = []
-  amq_queues['queue'].each do |queue|
-    if should_monitor_queue(queue['name'], amq_queues_to_monitor)
-      q = {}
-      q['name'] = queue['name']
-      q['stats'] = queue['stats'][0]
-      queues << q
+  amq_queues = XmlSimple.xml_in(open(url,http_basic_authentication: [user, pass]))
+  if amq_queues.empty?
+    $logger.info("no queues found")
+  else
+    amq_queues['queue'].each do |queue|
+      if should_monitor_queue(queue['name'], amq_queues_to_monitor)
+        q = {}
+        q['name'] = queue['name']
+        q['stats'] = queue['stats'][0]
+        queues << q
+      end
     end
   end
   queues
