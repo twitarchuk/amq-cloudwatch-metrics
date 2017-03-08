@@ -22,6 +22,7 @@ def main
   amq_url = ENV["AMQ_ADMIN_URL"]
   amq_user = ENV["AMQ_ADMIN_USER"] || 'admin'
   amq_pass = ENV["AMQ_ADMIN_PASS"] || 'admin'
+  amq_queues_to_monitor = ENV["AMQ_QUEUES"] || nil
 
   if amq_url.nil? then
     $logger.error("please set AMQ_ADMIN_URL environment variable")
@@ -44,12 +45,24 @@ def fetch_queue_stats(url, user, pass)
   amq_queues = XmlSimple.xml_in(open(url,http_basic_authentication: [user, pass]))
   queues = []
   amq_queues['queue'].each do |queue|
-    q = {}
-    q['name'] = queue['name']
-    q['stats'] = queue['stats'][0]
-    queues << q
+    if should_monitor_queue(queue['name'], amq_queues_to_monitor)
+      q = {}
+      q['name'] = queue['name']
+      q['stats'] = queue['stats'][0]
+      queues << q
+    end
   end
   queues
+end
+
+def should_monitor_queue(queue, queue_list)
+  queue_list.split(',').each do |queue_match|
+    match = queue =~ /#{queue_match}/
+    if !match.nil? && match >= 0
+      return true
+    end
+  end unless queue_list.nil?
+  return queue_list.nil?
 end
 
 

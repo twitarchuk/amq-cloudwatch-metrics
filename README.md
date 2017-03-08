@@ -12,6 +12,8 @@ Docker container to push activemq metrics to cloudwatch
 | AMQ_ADMIN_URL            | activemq admin xml url e.g. http://amqweb:8161/admin/xml/queues.jsp       |
 | AMQ_ADMIN_USER           | activemq admin username default `admin`                                   |
 | AMQ_ADMIN_PASS           |  activemq admin password default `admin`                                  |
+| AMQ_ADMIN_PASS           |  activemq admin password default `admin`                                  |
+| AMQ_QUEUES               |  a comma separated list of queue names to monitor can include wildcards   |
 | LOG_VEBOSE               | logs detailed metric collection data                                      |
 
 You can optional set the AWS Creds environment variables AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY if the container isn't running on AWS
@@ -36,7 +38,20 @@ You can optional set the AWS Creds environment variables AWS_ACCESS_KEY_ID & AWS
     -e AMQ_ADMIN_URL="http://amqweb:8161/admin/xml/queues.jsp" \
     -e CLOUDWATCH_NAMESPACE="Prod/ActiveMQ" \
     -e CLOUDWATCH_INTERVAL_SEC=60 \
-    -e ENVIRONMENT=prod
-    --restart always
+    -e ENVIRONMENT=prod \
+    --restart always \
     base2/amq-cloudwatch-metrics
 ```
+monitors all queues by default
+
+```bash
+  docker run -d --name amq-cloudwatch-metrics \
+    -e AMQ_ADMIN_URL="http://amqweb:8161/admin/xml/queues.jsp" \
+    -e CLOUDWATCH_NAMESPACE="Prod/ActiveMQ" \
+    -e CLOUDWATCH_INTERVAL_SEC=60 \
+    -e ENVIRONMENT=prod \
+    -e AMQ_QUEUES="myqueue,inbound.*,outbound_(.*)_billing" \
+    --restart always \
+    base2/amq-cloudwatch-metrics
+```
+This will only monitor queues with names matching myqueue and any queues match the wildcard patterns
