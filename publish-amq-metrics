@@ -13,7 +13,7 @@ end
 
 def main
 
-  cw_region = ENV['CLOUDWATCH_REGION'] || 'ap-southeast-2'
+  cw_region = ENV['CLOUDWATCH_REGION'] || 'eu-west-1'
   cw_namespace = ENV['CLOUDWATCH_NAMESPACE'] || 'ActiveMQ'
   cw_interval = ENV['CLOUDWATCH_INTERVAL_SEC'] || 5*60 #5 mintues
 
