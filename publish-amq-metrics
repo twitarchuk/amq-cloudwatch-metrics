@@ -7,7 +7,7 @@ require 'logger'
 
 $logger = Logger.new(STDOUT)
 $logger.level = Logger::INFO
-if ENV['LOG_VEBOSE'] == 'true'
+if ENV['LOG_VERBOSE'] == 'true'
   $logger.level = Logger::DEBUG
 end
 
